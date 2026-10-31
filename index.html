@@ -57,36 +57,27 @@
             letter-spacing: 1px;
         }
 
-        .game-info {
-            display: flex;
-            justify-content: space-between;
-            width: 100%;
-            margin-bottom: 16px;
-            font-size: 0.95rem;
-            color: var(--text-secondary);
-        }
-
         .controls-top {
             display: flex;
             gap: 10px;
             margin-bottom: 16px;
             width: 100%;
-            justify-content: space-between;
+            justify-content: center;
             align-items: center;
         }
 
-        select, button {
+        button {
             background-color: var(--border-color);
             color: var(--text-primary);
             border: none;
-            padding: 8px 12px;
+            padding: 8px 16px;
             border-radius: 8px;
             cursor: pointer;
             font-size: 0.9rem;
             transition: background-color 0.2s;
         }
 
-        select:hover, button:hover {
+        button:hover {
             background-color: #475569;
         }
 
@@ -147,9 +138,6 @@
         .cell:nth-child(3n) {
             border-right: 2px solid var(--text-primary);
         }
-        .cell:nth-last-child(n+1):nth-child(-n+9):nth-child(3n) {
-            /* handled by grid gaps or individual box borders */
-        }
 
         /* Row thick borders */
         .cell:nth-child(n+19):nth-child(-n+27),
@@ -196,17 +184,7 @@
         <h1>SUDOKU</h1>
         
         <div class="controls-top">
-            <select id="difficulty" onchange="newGame()">
-                <option value="easy">Easy</option>
-                <option value="medium" selected>Medium</option>
-                <option value="hard">Hard</option>
-            </select>
             <button class="btn-primary" onclick="newGame()">New Game</button>
-        </div>
-
-        <div class="game-info">
-            <span id="timer">Time: 00:00</span>
-            <span id="mistakes">Mistakes: 0/3</span>
         </div>
 
         <div class="sudoku-grid" id="grid"></div>
@@ -232,14 +210,9 @@
         let solution = [];
         let initialBoard = [];
         let selectedCell = null;
-        let mistakes = 0;
-        let timer = 0;
-        let timerInterval = null;
         let gameActive = true;
 
         const gridEl = document.getElementById('grid');
-        const timerEl = document.getElementById('timer');
-        const mistakesEl = document.getElementById('mistakes');
         const messageEl = document.getElementById('message');
 
         // Initialize grid elements in DOM
@@ -254,49 +227,24 @@
             }
         }
 
-        function startTimer() {
-            clearInterval(timerInterval);
-            timer = 0;
-            updateTimerDisplay();
-            timerInterval = setInterval(() => {
-                if (!gameActive) return;
-                timer++;
-                updateTimerDisplay();
-            }, 1000);
-        }
-
-        function updateTimerDisplay() {
-            const minutes = Math.floor(timer / 60).toString().padStart(2, '0');
-            const seconds = (timer % 60).toString().padStart(2, '0');
-            timerEl.textContent = `Time: ${minutes}:${seconds}`;
-        }
-
-        // Basic Sudoku Generator logic
+        // Basic Sudoku Generator logic with a random number of cells removed
         function newGame() {
             gameActive = true;
-            mistakes = 0;
-            mistakesEl.textContent = `Mistakes: ${mistakes}/3`;
             messageEl.textContent = '';
             selectedCell = null;
             
             generateSudoku();
-            startTimer();
             renderBoard();
         }
 
         function generateSudoku() {
-            // Generate a valid solved grid first
             solution = Array(9).fill(0).map(() => Array(9).fill(0));
             fillSudoku(solution);
 
-            // Copy solution to board
             board = solution.map(row => [...row]);
 
-            // Remove numbers based on difficulty
-            const difficulty = document.getElementById('difficulty').value;
-            let removeCount = 35; // Medium
-            if (difficulty === 'easy') removeCount = 25;
-            if (difficulty === 'hard5' || difficulty === 'hard') removeCount = 48;
+            // Randomly choose how many numbers to remove (between 30 and 52 for a varied mix)
+            let removeCount = Math.floor(Math.random() * (52 - 30 + 1)) + 30;
 
             let removed = 0;
             while (removed < removeCount) {
@@ -372,7 +320,10 @@
 
                 if (initialBoard[row][col] !== 0) {
                     cell.classList.add('fixed');
+                } else if (val !== 0 && val !== solution[row][col]) {
+                    cell.classList.add('error');
                 }
+
                 if (selectedCell === index) {
                     cell.classList.add('selected');
                 }
@@ -389,7 +340,6 @@
                 if (idx === index) {
                     cell.classList.add('selected');
                 } else {
-                    // Highlight same row, col, or subgrid
                     const r1 = Math.floor(index / 9), c1 = index % 9;
                     const r2 = Math.floor(idx / 9), c2 = idx % 9;
                     if (r1 === r2 || c1 === c2 || (Math.floor(r1/3) === Math.floor(r2/3) && Math.floor(c1/3) === Math.floor(c2/3))) {
@@ -406,43 +356,21 @@
 
             if (initialBoard[row][col] !== 0) return; // Can't modify original clues
 
-            if (num === 0) {
-                board[row][col] = 0;
-                renderBoard();
-                return;
-            }
-
             board[row][col] = num;
-            
-            // Check if correct against solution
-            if (solution[row][col] !== num) {
-                mistakes++;
-                mistakesEl.textContent = `Mistakes: ${mistakes}/3`;
-                const cell = document.querySelectorAll('.cell')[selectedCell];
-                cell.classList.add('error');
-                
-                if (mistakes >= 3) {
-                    gameActive = false;
-                    clearInterval(timerInterval);
-                    messageEl.textContent = "Game Over! Too many mistakes.";
-                    messageEl.style.color = "var(--cell-error)";
-                }
-            } else {
-                // Check win condition
-                if (checkWin()) {
-                    gameActive = false;
-                    clearInterval(timerInterval);
-                    messageEl.textContent = `🎉 Awesome! You solved it in ${timerEl.textContent.replace('Time: ', '')}!`;
-                    messageEl.style.color = "var(--accent)";
-                }
-            }
             renderBoard();
+
+            // Check win condition if grid is full and error-free
+            if (checkWin()) {
+                gameActive = false;
+                messageEl.textContent = "🎉 Awesome! You solved it!";
+                messageEl.style.color = "var(--accent)";
+            }
         }
 
         function checkWin() {
             for (let r = 0; r < 9; r++) {
                 for (let c = 0; c < 9; c++) {
-                    if (board[r][c] !== solution[r][c]) return false;
+                    if (board[r][c] === 0 || board[r][c] !== solution[r][c]) return false;
                 }
             }
             return true;
